@@ -4,9 +4,8 @@ A lightweight Windows system-tray app for typing predefined text snippets — pa
 
 ## Features
 
-- **Global hotkeys** — Press `Ctrl+Shift+1` through `Ctrl+Shift+9` (and `Ctrl+Shift+0` for slot 10) to instantly type a snippet into any focused window
-- **RDP-aware** — Automatically detects when an RDP window is focused and uses clipboard+Ctrl+V instead of keystrokes, so snippets paste reliably into remote sessions
-- **Smart input** — Uses `SendInput` Unicode keystrokes for local windows (clipboard untouched); switches to clipboard+Ctrl+V automatically for RDP windows
+- **Global hotkeys** — Press `Ctrl+Shift+1` through `Ctrl+Shift+9` (and `Ctrl+Shift+0` for slot 10) to instantly paste a snippet into any focused window
+- **Clipboard-based paste** — Uses clipboard + Ctrl+V to inject text, so it works with all window types including password fields. The previous clipboard contents are restored automatically.
 - **Encrypted storage** — All snippet content is encrypted with AES-256-GCM using a master password you set on first launch. The master password is never stored.
 - **Lives in the tray** — Minimize to the system tray via `Ctrl+Shift+-`. Click or double-click the **XP** tray icon (or press `Ctrl+Shift++`) to reopen.
 - **Auto-start** — Toggle "Start with Windows" in the tray menu or the header switch to launch xpaste automatically at login (registry run key, no admin rights required)
@@ -60,14 +59,7 @@ The output lands in `xpaste\publish\xpaste.exe` — a single portable executable
 
 > ⚠️ **THIS IS EXPERIMENTAL AND HAS NOT BEEN TESTED**
 
-xpaste automatically detects when an RDP client window (`mstsc.exe` or `msrdc.exe`) is in focus and switches its paste method accordingly:
-
-| Target window | Method |
-|---|---|
-| Local app | `SendInput` Unicode keystrokes — types directly, clipboard untouched |
-| RDP window | Sets clipboard → sends Ctrl+V → restores clipboard after 500 ms |
-
-RDP clipboard redirection syncs your local clipboard to the remote session, so Ctrl+V pastes correctly on the remote machine.
+Since xpaste uses clipboard + Ctrl+V for all paste operations, it should work with RDP sessions as long as clipboard redirection is enabled. RDP clipboard redirection syncs your local clipboard to the remote session, so Ctrl+V pastes correctly on the remote machine.
 
 **Prerequisite:** Clipboard redirection must be enabled in your RDP connection (it is on by default).
 To verify: in mstsc → **Show Options** → **Local Resources** tab → ensure **Clipboard** is ticked.
