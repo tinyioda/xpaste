@@ -58,6 +58,8 @@ The output lands in `xpaste\publish\xpaste.exe` — a single portable executable
 
 ## RDP Support
 
+> ⚠️ **THIS IS EXPERIMENTAL AND HAS NOT BEEN TESTED**
+
 xpaste automatically detects when an RDP client window (`mstsc.exe` or `msrdc.exe`) is in focus and switches its paste method accordingly:
 
 | Target window | Method |
