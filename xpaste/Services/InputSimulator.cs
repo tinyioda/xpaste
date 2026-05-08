@@ -8,7 +8,9 @@ namespace xpaste.Services;
 /// Injects text into the currently focused window using the best available method
 /// for the target application:
 /// <list type="bullet">
-///   <item><description><b>mstsc (Remote Desktop)</b>: character-by-character Unicode keystrokes — the RDP password field blocks Ctrl+V</description></item>
+///   <item><description><b>mstsc (Remote Desktop)</b>: WM_CHAR posted directly to the focused
+///   control HWND — bypasses the synthetic-input security that blocks SendInput in the RDP
+///   password field.</description></item>
 ///   <item><description><b>PuTTY / KiTTY</b>: clipboard + Shift+Insert (PuTTY does not support Ctrl+V)</description></item>
 ///   <item><description><b>All other windows</b>: clipboard + Ctrl+V</description></item>
 /// </list>
@@ -21,9 +23,11 @@ namespace xpaste.Services;
 /// </summary>
 public static class InputSimulator
 {
-    [DllImport("user32.dll", SetLastError = true)] private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
-    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    [DllImport("user32.dll", SetLastError = true)] private static extern uint   SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+    [DllImport("user32.dll")]                      private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]                      private static extern uint   GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    [DllImport("user32.dll")]                      private static extern bool   GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
+    [DllImport("user32.dll")]                      private static extern bool   PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT { public uint type; public INPUTUNION u; }
@@ -34,19 +38,36 @@ public static class InputSimulator
     [StructLayout(LayoutKind.Sequential)]
     private struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
 
-    private const uint INPUT_KEYBOARD   = 1;
-    private const uint KEYEVENTF_KEYUP  = 0x0002;
-    private const uint KEYEVENTF_UNICODE = 0x0004;
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int left, top, right, bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GUITHREADINFO
+    {
+        public uint   cbSize;
+        public uint   flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public RECT   rcCaret;
+    }
+
+    private const uint INPUT_KEYBOARD  = 1;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint WM_CHAR         = 0x0102;
 
     private const ushort VK_SHIFT   = 0x10;
     private const ushort VK_CONTROL = 0x11;
     private const ushort VK_INSERT  = 0x2D;
     private const ushort VK_V       = 0x56;
 
-    private enum PasteMode { CtrlV, ShiftInsert, Keystrokes }
+    private enum PasteMode { CtrlV, ShiftInsert, WmChar }
 
-    // mstsc password field blocks Ctrl+V — must type character by character
-    private static readonly HashSet<string> KeystrokeProcesses = new(StringComparer.OrdinalIgnoreCase)
+    // mstsc password field blocks all synthetic SendInput — post WM_CHAR directly
+    private static readonly HashSet<string> WmCharProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
         "mstsc",  // Remote Desktop Connection
     };
@@ -68,8 +89,8 @@ public static class InputSimulator
         PasteMode mode = GetPasteMode();
         AppLogger.Info($"Pasting via {mode} ({text.Length} chars)");
 
-        if (mode == PasteMode.Keystrokes)
-            TypeViaKeystrokes(text);
+        if (mode == PasteMode.WmChar)
+            TypeViaWmChar(text);
         else
             TypeViaClipboard(text, mode == PasteMode.ShiftInsert);
     }
@@ -84,7 +105,7 @@ public static class InputSimulator
             var proc = Process.GetProcessById((int)pid);
             AppLogger.Info($"Foreground process: {proc.ProcessName} (PID {pid})");
 
-            if (KeystrokeProcesses.Contains(proc.ProcessName))  return PasteMode.Keystrokes;
+            if (WmCharProcesses.Contains(proc.ProcessName))      return PasteMode.WmChar;
             if (ShiftInsertProcesses.Contains(proc.ProcessName)) return PasteMode.ShiftInsert;
             return PasteMode.CtrlV;
         }
@@ -96,29 +117,33 @@ public static class InputSimulator
     }
 
     /// <summary>
-    /// Sends text character-by-character via Unicode keystrokes.
-    /// Used for targets like mstsc that block clipboard paste in their password fields.
+    /// Posts <c>WM_CHAR</c> messages directly to the focused control HWND in the foreground
+    /// window's thread. This bypasses the synthetic-input security that blocks <c>SendInput</c>
+    /// in the mstsc password field.
     /// </summary>
-    private static void TypeViaKeystrokes(string text)
+    private static void TypeViaWmChar(string text)
     {
-        // Release Ctrl+Shift held by the hotkey, then send each character
-        var inputs = new List<INPUT>
-        {
-            MakeVkUp(VK_CONTROL),
-            MakeVkUp(VK_SHIFT)
-        };
+        // Release Ctrl+Shift held by the hotkey so they do not interfere
+        var modRelease = new[] { MakeVkUp(VK_CONTROL), MakeVkUp(VK_SHIFT) };
+        SendInput(2, modRelease, Marshal.SizeOf<INPUT>());
 
-        foreach (char c in text)
+        try
         {
-            inputs.Add(MakeUnicodeDown(c));
-            inputs.Add(MakeUnicodeUp(c));
+            // Locate the focused child control within the foreground window's thread
+            var    hwnd     = GetForegroundWindow();
+            uint   threadId = GetWindowThreadProcessId(hwnd, out uint _);
+            var    gti      = new GUITHREADINFO { cbSize = (uint)Marshal.SizeOf<GUITHREADINFO>() };
+            GetGUIThreadInfo(threadId, ref gti);
+            IntPtr target   = gti.hwndFocus != IntPtr.Zero ? gti.hwndFocus : hwnd;
+
+            AppLogger.Info($"PostMessage WM_CHAR to hwnd=0x{target:X}, {text.Length} chars");
+            foreach (char c in text)
+                PostMessage(target, WM_CHAR, (IntPtr)c, (IntPtr)1);
         }
-
-        int structSize = Marshal.SizeOf<INPUT>();
-        var arr = inputs.ToArray();
-        uint sent = SendInput((uint)arr.Length, arr, structSize);
-        int err = Marshal.GetLastWin32Error();
-        AppLogger.Info($"SendInput keystrokes: sent={sent}/{arr.Length}, lastErr={err}");
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"TypeViaWmChar failed: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -149,9 +174,9 @@ public static class InputSimulator
                 // Release Ctrl+Shift (held by hotkey), then Ctrl+V
                 : [MakeVkUp(VK_CONTROL), MakeVkUp(VK_SHIFT), MakeVkDown(VK_CONTROL), MakeVkDown(VK_V), MakeVkUp(VK_V), MakeVkUp(VK_CONTROL)];
 
-            int structSize = Marshal.SizeOf<INPUT>();
-            uint sent = SendInput((uint)inputs.Length, inputs, structSize);
-            int err = Marshal.GetLastWin32Error();
+            int  structSize = Marshal.SizeOf<INPUT>();
+            uint sent       = SendInput((uint)inputs.Length, inputs, structSize);
+            int  err        = Marshal.GetLastWin32Error();
             AppLogger.Info($"SendInput paste: sent={sent}, lastErr={err}");
 
             // Restore previous clipboard after a short delay
@@ -182,17 +207,5 @@ public static class InputSimulator
     {
         type = INPUT_KEYBOARD,
         u = new INPUTUNION { ki = new KEYBDINPUT { wVk = vk, dwFlags = KEYEVENTF_KEYUP } }
-    };
-
-    private static INPUT MakeUnicodeDown(char c) => new()
-    {
-        type = INPUT_KEYBOARD,
-        u = new INPUTUNION { ki = new KEYBDINPUT { wScan = c, dwFlags = KEYEVENTF_UNICODE } }
-    };
-
-    private static INPUT MakeUnicodeUp(char c) => new()
-    {
-        type = INPUT_KEYBOARD,
-        u = new INPUTUNION { ki = new KEYBDINPUT { wScan = c, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP } }
     };
 }
