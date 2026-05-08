@@ -102,8 +102,10 @@ public static class InputSimulator
             }
 
             INPUT[] inputs = useShiftInsert
-                ? [MakeVkDown(VK_SHIFT), MakeVkDown(VK_INSERT), MakeVkUp(VK_INSERT), MakeVkUp(VK_SHIFT)]
-                : [MakeVkDown(VK_CONTROL), MakeVkDown(VK_V), MakeVkUp(VK_V), MakeVkUp(VK_CONTROL)];
+                // Release Ctrl (held by hotkey), then Shift+Insert
+                ? [MakeVkUp(VK_CONTROL), MakeVkDown(VK_SHIFT), MakeVkDown(VK_INSERT), MakeVkUp(VK_INSERT), MakeVkUp(VK_SHIFT)]
+                // Release Ctrl+Shift (held by hotkey), then Ctrl+V
+                : [MakeVkUp(VK_CONTROL), MakeVkUp(VK_SHIFT), MakeVkDown(VK_CONTROL), MakeVkDown(VK_V), MakeVkUp(VK_V), MakeVkUp(VK_CONTROL)];
 
             int structSize = Marshal.SizeOf<INPUT>();
             uint sent = SendInput((uint)inputs.Length, inputs, structSize);
