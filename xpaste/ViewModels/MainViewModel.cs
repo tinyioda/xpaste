@@ -71,6 +71,9 @@ public partial class MainViewModel : ObservableObject
     /// <summary>True while the info/help overlay is visible.</summary>
     [ObservableProperty] private bool _isShowingInfo;
 
+    /// <summary>True while the exit-confirmation overlay is visible.</summary>
+    [ObservableProperty] private bool _isConfirmingExit;
+
     private bool _initComplete;
 
     /// <summary>
@@ -177,6 +180,18 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Toggles the info/help overlay.</summary>
     [RelayCommand]
     public void ToggleInfo() => IsShowingInfo = !IsShowingInfo;
+
+    /// <summary>Shows the exit-confirmation overlay.</summary>
+    [RelayCommand]
+    public void RequestExit() => IsConfirmingExit = true;
+
+    /// <summary>Confirmed exit — shuts down the application.</summary>
+    [RelayCommand]
+    public void ConfirmExit() => System.Windows.Application.Current.Shutdown();
+
+    /// <summary>Cancels the exit request and hides the overlay.</summary>
+    [RelayCommand]
+    public void CancelExit() => IsConfirmingExit = false;
 
     /// <summary>Writes or removes the Windows registry run-key entry when the auto-start toggle changes.</summary>
     partial void OnAutoStartChanged(bool value)

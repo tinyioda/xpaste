@@ -58,6 +58,12 @@
                             ToolTip="Keyboard shortcuts &amp; help">
                         <md:PackIcon Kind="InformationOutline" Width="20" Height="20"/>
                     </Button>
+                    <Button Style="{StaticResource MaterialDesignIconButton}"
+                            Foreground="White" Padding="4" Margin="4,0,0,0"
+                            Command="{Binding RequestExitCommand}"
+                            ToolTip="Exit xpaste">
+                        <md:PackIcon Kind="Power" Width="20" Height="20"/>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
@@ -266,6 +272,34 @@
                     <Button Content="CLOSE" HorizontalAlignment="Center" Margin="0,24,0,0"
                             Style="{StaticResource MaterialDesignRaisedButton}"
                             Command="{Binding ToggleInfoCommand}"/>
+                </StackPanel>
+            </md:Card>
+        </Grid>
+
+        <!-- ═══ EXIT CONFIRMATION OVERLAY ═══ -->
+        <Grid Grid.Row="0" Grid.RowSpan="4"
+              Visibility="{Binding IsConfirmingExit, Converter={StaticResource BoolToVis}}">
+            <Rectangle Fill="Black" Opacity="0.55"/>
+            <md:Card HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Padding="32,28" md:ElevationAssist.Elevation="Dp8"
+                     Background="#2D2D2D" MinWidth="300">
+                <StackPanel>
+                    <md:PackIcon Kind="Power" Width="36" Height="36"
+                                 Foreground="#EF5350" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    <TextBlock Text="Exit xpaste?" FontSize="18" FontWeight="Bold"
+                               Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="The app will stop running and hotkeys will no longer work."
+                               Foreground="#AAAAAA" FontSize="13" TextAlignment="Center"
+                               TextWrapping="Wrap" Margin="0,0,0,24"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="CANCEL" Margin="0,0,12,0"
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                Foreground="White" BorderBrush="White"
+                                Command="{Binding CancelExitCommand}"/>
+                        <Button Content="EXIT" Background="#EF5350" Foreground="White"
+                                Style="{StaticResource MaterialDesignRaisedButton}"
+                                Command="{Binding ConfirmExitCommand}"/>
+                    </StackPanel>
                 </StackPanel>
             </md:Card>
         </Grid>
