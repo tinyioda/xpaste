@@ -5,13 +5,14 @@ using System.Windows;
 namespace xpaste.Services;
 
 /// <summary>
-/// Injects text into the currently focused window via clipboard paste.
-/// Automatically selects the correct paste keystroke for the target window:
+/// Injects text into the currently focused window using the best available method
+/// for the target application:
 /// <list type="bullet">
-///   <item><description><b>PuTTY / KiTTY</b>: Shift+Insert (PuTTY does not support Ctrl+V)</description></item>
-///   <item><description><b>All other windows</b>: Ctrl+V</description></item>
+///   <item><description><b>mstsc (Remote Desktop)</b>: character-by-character Unicode keystrokes — the RDP password field blocks Ctrl+V</description></item>
+///   <item><description><b>PuTTY / KiTTY</b>: clipboard + Shift+Insert (PuTTY does not support Ctrl+V)</description></item>
+///   <item><description><b>All other windows</b>: clipboard + Ctrl+V</description></item>
 /// </list>
-/// Previous clipboard contents are restored after a short delay.
+/// Previous clipboard contents are restored after a short delay (clipboard paths only).
 /// <para>
 /// <b>Struct sizing note:</b> On 64-bit Windows the <c>INPUT</c> struct must be exactly 40 bytes.
 /// The union field is padded to 28 bytes (the size of <c>MOUSEINPUT</c>) to match the native ABI;
@@ -33,15 +34,24 @@ public static class InputSimulator
     [StructLayout(LayoutKind.Sequential)]
     private struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
 
-    private const uint INPUT_KEYBOARD = 1;
-    private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint INPUT_KEYBOARD   = 1;
+    private const uint KEYEVENTF_KEYUP  = 0x0002;
+    private const uint KEYEVENTF_UNICODE = 0x0004;
 
     private const ushort VK_SHIFT   = 0x10;
     private const ushort VK_CONTROL = 0x11;
     private const ushort VK_INSERT  = 0x2D;
     private const ushort VK_V       = 0x56;
 
-    // Terminals that use Shift+Insert instead of Ctrl+V for paste
+    private enum PasteMode { CtrlV, ShiftInsert, Keystrokes }
+
+    // mstsc password field blocks Ctrl+V — must type character by character
+    private static readonly HashSet<string> KeystrokeProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "mstsc",  // Remote Desktop Connection
+    };
+
+    // Terminals that use Shift+Insert instead of Ctrl+V
     private static readonly HashSet<string> ShiftInsertProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
         "putty",     // PuTTY
@@ -50,33 +60,65 @@ public static class InputSimulator
     };
 
     /// <summary>
-    /// Pastes <paramref name="text"/> into the currently focused window via clipboard,
-    /// using the appropriate paste keystroke for the target application.
+    /// Injects <paramref name="text"/> into the currently focused window using the
+    /// best method for the target application.
     /// </summary>
     public static void TypeText(string text)
     {
-        bool useShiftInsert = IsForegroundProcessShiftInsert();
-        AppLogger.Info($"Pasting via clipboard+{(useShiftInsert ? "Shift+Insert" : "Ctrl+V")} ([REDACTED] {text.Length} chars)");
-        TypeViaClipboard(text, useShiftInsert);
+        PasteMode mode = GetPasteMode();
+        AppLogger.Info($"Pasting via {mode} ({text.Length} chars)");
+
+        if (mode == PasteMode.Keystrokes)
+            TypeViaKeystrokes(text);
+        else
+            TypeViaClipboard(text, mode == PasteMode.ShiftInsert);
     }
 
-    private static bool IsForegroundProcessShiftInsert()
+    private static PasteMode GetPasteMode()
     {
         try
         {
             var hwnd = GetForegroundWindow();
-            if (hwnd == IntPtr.Zero) return false;
+            if (hwnd == IntPtr.Zero) return PasteMode.CtrlV;
             GetWindowThreadProcessId(hwnd, out uint pid);
             var proc = Process.GetProcessById((int)pid);
-            bool match = ShiftInsertProcesses.Contains(proc.ProcessName);
-            AppLogger.Info($"Foreground process: {proc.ProcessName} (PID {pid}), shiftInsert={match}");
-            return match;
+            AppLogger.Info($"Foreground process: {proc.ProcessName} (PID {pid})");
+
+            if (KeystrokeProcesses.Contains(proc.ProcessName))  return PasteMode.Keystrokes;
+            if (ShiftInsertProcesses.Contains(proc.ProcessName)) return PasteMode.ShiftInsert;
+            return PasteMode.CtrlV;
         }
         catch (Exception ex)
         {
-            AppLogger.Warn($"IsForegroundProcessShiftInsert failed: {ex.Message}");
-            return false;
+            AppLogger.Warn($"GetPasteMode failed: {ex.Message}");
+            return PasteMode.CtrlV;
         }
+    }
+
+    /// <summary>
+    /// Sends text character-by-character via Unicode keystrokes.
+    /// Used for targets like mstsc that block clipboard paste in their password fields.
+    /// </summary>
+    private static void TypeViaKeystrokes(string text)
+    {
+        // Release Ctrl+Shift held by the hotkey, then send each character
+        var inputs = new List<INPUT>
+        {
+            MakeVkUp(VK_CONTROL),
+            MakeVkUp(VK_SHIFT)
+        };
+
+        foreach (char c in text)
+        {
+            inputs.Add(MakeUnicodeDown(c));
+            inputs.Add(MakeUnicodeUp(c));
+        }
+
+        int structSize = Marshal.SizeOf<INPUT>();
+        var arr = inputs.ToArray();
+        uint sent = SendInput((uint)arr.Length, arr, structSize);
+        int err = Marshal.GetLastWin32Error();
+        AppLogger.Info($"SendInput keystrokes: sent={sent}/{arr.Length}, lastErr={err}");
     }
 
     /// <summary>
@@ -140,5 +182,17 @@ public static class InputSimulator
     {
         type = INPUT_KEYBOARD,
         u = new INPUTUNION { ki = new KEYBDINPUT { wVk = vk, dwFlags = KEYEVENTF_KEYUP } }
+    };
+
+    private static INPUT MakeUnicodeDown(char c) => new()
+    {
+        type = INPUT_KEYBOARD,
+        u = new INPUTUNION { ki = new KEYBDINPUT { wScan = c, dwFlags = KEYEVENTF_UNICODE } }
+    };
+
+    private static INPUT MakeUnicodeUp(char c) => new()
+    {
+        type = INPUT_KEYBOARD,
+        u = new INPUTUNION { ki = new KEYBDINPUT { wScan = c, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP } }
     };
 }
