@@ -19,9 +19,23 @@ namespace xpaste.Services;
 /// </summary>
 public class SnippetStore
 {
-    private static readonly string DataDir =
+    private static readonly string DefaultDataDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "xpaste");
-    private static readonly string DataFile = Path.Combine(DataDir, "snippets.json");
+    private static readonly string DefaultDataFile =
+        Path.Combine(DefaultDataDir, "snippets.json");
+
+    private readonly string _dataDir;
+    private readonly string _dataFile;
+
+    /// <summary>Production constructor — uses <c>%AppData%\xpaste\snippets.json</c>.</summary>
+    public SnippetStore() : this(DefaultDataFile) { }
+
+    /// <summary>Testing constructor — uses the supplied file path instead of AppData.</summary>
+    internal SnippetStore(string dataFile)
+    {
+        _dataFile = dataFile;
+        _dataDir  = Path.GetDirectoryName(dataFile)!;
+    }
 
     private byte[]? _key;
     private SnippetStoreFile _storeFile = new();
@@ -33,7 +47,7 @@ public class SnippetStore
     public bool IsUnlocked => _key != null;
 
     /// <summary><c>true</c> when a store file already exists on disk.</summary>
-    public bool HasStore => File.Exists(DataFile);
+    public bool HasStore => File.Exists(_dataFile);
 
     /// <summary>
     /// First-time setup: derives a new AES key from <paramref name="masterPassword"/>,
@@ -63,7 +77,7 @@ public class SnippetStore
     /// <returns><c>true</c> on success; <c>false</c> if the password is incorrect.</returns>
     public bool Unlock(string masterPassword)
     {
-        var json = File.ReadAllText(DataFile);
+        var json = File.ReadAllText(_dataFile);
         _storeFile = JsonSerializer.Deserialize<SnippetStoreFile>(json)!;
         var salt = Convert.FromBase64String(_storeFile.Salt);
         var key = EncryptionService.DeriveKey(masterPassword, salt);
@@ -170,8 +184,9 @@ public class SnippetStore
     private void Save()
     {
         if (_key == null) return;
-        Directory.CreateDirectory(DataDir);
+        Directory.CreateDirectory(_dataDir);
         _storeFile.Snippets = Snippets.Select(x => x.Meta).ToList();
-        File.WriteAllText(DataFile, JsonSerializer.Serialize(_storeFile, new JsonSerializerOptions { WriteIndented = true }));
+        File.WriteAllText(_dataFile, JsonSerializer.Serialize(_storeFile, new JsonSerializerOptions { WriteIndented = true }));
     }
 }
+

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="xpaste.Tests/xpaste.Tests.csproj" />
+  <Project Path="xpaste/xpaste.csproj" />
+</Solution>
