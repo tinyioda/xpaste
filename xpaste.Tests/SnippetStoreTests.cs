@@ -118,24 +118,15 @@ public class SnippetStoreTests : IDisposable
         _store.Remove(Guid.NewGuid()); // should not throw
     }
 
-    // ── GetContentBySlot ─────────────────────────────────────────────────────
+    // ── GetBySlot ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void GetContentBySlot_AssignedSlot_ReturnsContent()
+    public void GetBySlot_AssignedSlot_ReturnsContent()
     {
         _store.Initialize("master");
         _store.AddOrUpdate(new Snippet { Id = Guid.NewGuid(), Name = "pw", Slot = 3 }, "secret123");
-        Assert.Equal("secret123", _store.GetContentBySlot(3));
+        Assert.Equal("secret123", _store.GetBySlot(3)!.Value.Content);
     }
-
-    [Fact]
-    public void GetContentBySlot_UnassignedSlot_ReturnsNull()
-    {
-        _store.Initialize("master");
-        Assert.Null(_store.GetContentBySlot(7));
-    }
-
-    // ── GetBySlot ────────────────────────────────────────────────────────────
 
     [Fact]
     public void GetBySlot_AssignedSlot_ReturnsContentAndMethod()

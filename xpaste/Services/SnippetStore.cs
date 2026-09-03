@@ -175,13 +175,6 @@ public class SnippetStore
     }
 
     /// <summary>
-    /// Returns the decrypted content for the snippet assigned to <paramref name="slot"/>,
-    /// or <c>null</c> if no snippet is assigned to that slot.
-    /// </summary>
-    public string? GetContentBySlot(int slot)
-        => Snippets.FirstOrDefault(x => x.Meta.Slot == slot).PlainContent;
-
-    /// <summary>
     /// Returns the decrypted content and delivery method for the snippet assigned to
     /// <paramref name="slot"/>, or <c>null</c> if no snippet is assigned to that slot.
     /// </summary>
