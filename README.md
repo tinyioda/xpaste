@@ -4,8 +4,8 @@ A lightweight Windows system-tray app for typing predefined text snippets — pa
 
 ## Features
 
-- **Global hotkeys** — Press `Ctrl+Shift+1` through `Ctrl+Shift+9` (and `Ctrl+Shift+0` for slot 10) to instantly paste a snippet into any focused window
-- **Clipboard-based paste** — Uses clipboard + Ctrl+V to inject text, so it works with all window types including password fields. The previous clipboard contents are restored automatically.
+- **Global hotkeys** — Press `Ctrl+Shift+1` through `Ctrl+Shift+9` (and `Ctrl+Shift+0` for slot 10) to instantly type a snippet into any focused window
+- **Real keystroke injection** — Snippets are typed one character at a time as hardware-style scan codes, exactly as a physical keyboard would produce them. This is what makes them work in **RDP sessions, SSH/terminal password prompts and Windows password fields**, and it means your password is never placed on the clipboard.
 - **Encrypted storage** — All snippet content is encrypted with AES-256-GCM using a master password you set on first launch. The master password is never stored.
 - **Lives in the tray** — Minimize to the system tray via `Ctrl+Shift+-`. Click or double-click the **XP** tray icon (or press `Ctrl+Shift++`) to reopen.
 - **Auto-start** — Toggle "Start with Windows" in the tray menu or the header switch to launch xpaste automatically at login (registry run key, no admin rights required)
@@ -48,21 +48,74 @@ The output lands in `xpaste\publish\xpaste.exe` — a single portable executable
 | Type snippet into focused window | `Ctrl+Shift+1` through `Ctrl+Shift+0` |
 | Add a snippet | Click the **+** button |
 | Edit a snippet | Click the pencil icon on a snippet card |
+| Choose how a snippet is delivered | **Delivery method** dropdown in the edit form |
 | Delete a snippet | Click the red trash icon on a snippet card, confirm in the inline overlay |
 | View keyboard shortcuts | Click the **ⓘ** button in the header |
 | Toggle auto-start | Header switch in the management window, or right-click tray icon → **Start with Windows** |
 | Change master password | Right-click tray icon → **Change Master Password…** |
+| Type into an elevated app | Right-click tray icon → **Restart as Administrator…** |
 | View diagnostic log | Right-click tray icon → **View Log** |
 | Exit | Right-click tray icon → **Exit** |
 
-## RDP Support
+## How Pasting Works
 
-> ⚠️ **THIS IS EXPERIMENTAL AND HAS NOT BEEN TESTED**
+xpaste **types** your snippet rather than pasting it. Each character is sent through `SendInput`
+as a hardware-style scan-code key event, with modifiers applied per character, so the target
+application cannot tell the difference between xpaste and your keyboard.
 
-Since xpaste uses clipboard + Ctrl+V for all paste operations, it should work with RDP sessions as long as clipboard redirection is enabled. RDP clipboard redirection syncs your local clipboard to the remote session, so Ctrl+V pastes correctly on the remote machine.
+This matters because the two obvious alternatives both fail in exactly the places a password
+manager is most needed:
 
-**Prerequisite:** Clipboard redirection must be enabled in your RDP connection (it is on by default).
-To verify: in mstsc → **Show Options** → **Local Resources** tab → ensure **Clipboard** is ticked.
+| Approach | Why it isn't used |
+|---|---|
+| Clipboard + `Ctrl+V` | RDP credential prompts and remote lock screens never read the local clipboard; terminals like PuTTY ignore `Ctrl+V`; and the secret is readable by every process on the machine while it sits there |
+| `PostMessage(WM_CHAR)` | Bypasses the input queue, so password fields, games and RDP ignore it entirely, and Windows blocks it against elevated windows |
+
+Two details are load-bearing:
+
+- **Scan codes must be real.** RDP, Hyper-V, VMware and Citrix forward the *scan code* of a key
+  event, not the virtual key. An event with `wScan == 0` arrives at the remote end as "no key at
+  all" — which is why virtual-key-only injection silently does nothing over RDP.
+- **The hotkey modifiers must be released first.** `Ctrl+Shift+1` leaves Ctrl and Shift physically
+  down and auto-repeating. xpaste waits for you to let go before typing; if you keep holding the
+  hotkey it refuses to type rather than sending mangled text into a password field.
+
+Characters that have no key on the active keyboard layout fall back to Unicode injection
+(`KEYEVENTF_UNICODE`). That works locally but is generally **not** forwarded into remote sessions,
+so for RDP keep the local and remote keyboard layouts the same.
+
+### Choosing a delivery method per snippet
+
+Each snippet has a **Delivery method**:
+
+- **Type as keystrokes** (default) — works in RDP, SSH and password fields; keeps the secret off the clipboard.
+- **Clipboard + Ctrl+V** — much faster for long, non-sensitive boilerplate, but not suitable for passwords.
+
+### Elevated applications
+
+Windows UIPI forbids a normal process from sending input to a window owned by an *elevated*
+process. If the target runs as administrator, xpaste's keystrokes are discarded — it detects this
+and tells you. Use **Restart as Administrator…** in the tray menu, then try again.
+
+### Known limitation: the secure desktop
+
+UAC consent prompts, the lock screen and `Ctrl+Alt+Del` run on a separate *secure desktop*. No
+user-mode application can type into those, by design. xpaste detects this and says so instead of
+failing silently — you'll have to type those by hand.
+
+## RDP & SSH
+
+Because snippets are delivered as ordinary keystrokes, they work in Remote Desktop and terminal
+sessions the same way typing does — no clipboard redirection required:
+
+- **Remote Desktop (`mstsc`, `msrdc`, RDCMan)** — keystrokes are forwarded to the remote session,
+  including the remote sign-in screen. xpaste automatically slows its typing for remote clients,
+  which drop input that arrives faster than they can forward it.
+- **PuTTY / KiTTY / Windows Terminal / OpenSSH** — `sudo` and SSH password prompts read the terminal's
+  input stream directly, so typed characters are accepted where `Ctrl+V` would have been ignored.
+- **VM consoles (Hyper-V, VMware, VirtualBox) and Citrix** — same mechanism, same slower pacing.
+
+For the best results over RDP, make sure the local and remote keyboard layouts match.
 
 ## Data & Security
 
@@ -71,6 +124,7 @@ To verify: in mstsc → **Show Options** → **Local Resources** tab → ensure 
 - The encryption key is derived from your master password using **PBKDF2-SHA256** (200,000 iterations) with a random 128-bit salt
 - A verification blob is stored alongside the snippets so wrong passwords are detected immediately via the GCM authentication tag — no snippet data is ever decrypted with a wrong key
 - The master password exists only in memory while the app is unlocked; it is never written to disk
+- Snippet content is **never placed on the clipboard** unless you explicitly set a snippet's delivery method to *Clipboard + Ctrl+V*
 - **Change your master password** at any time via the tray icon → **Change Master Password…** — all snippets are automatically re-encrypted under the new key
 - **If you forget your master password**, there is no recovery. Delete `%AppData%\xpaste\snippets.json` to reset (all snippets will be lost), then restart xpaste to set a new password.
 
@@ -79,6 +133,10 @@ To verify: in mstsc → **Show Options** → **Local Resources** tab → ensure 
 xpaste writes a diagnostic log to `%AppData%\xpaste\xpaste.log`. The log rotates automatically when it reaches 1 MB (previous log saved as `xpaste.log.old`).
 
 **Privacy:** snippet content and passwords are never written to the log — they appear as `[REDACTED]` with only the character count.
+
+When a snippet cannot be typed, xpaste shows a tray notification explaining why (elevated target,
+secure desktop, hotkey still held) and records the same detail in the log along with the target
+process, the number of keystrokes planned and how many characters needed a Unicode fallback.
 
 Open the log via right-click tray icon → **View Log**.
 

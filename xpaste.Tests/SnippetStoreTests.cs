@@ -135,6 +135,64 @@ public class SnippetStoreTests : IDisposable
         Assert.Null(_store.GetContentBySlot(7));
     }
 
+    // ── GetBySlot ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetBySlot_AssignedSlot_ReturnsContentAndMethod()
+    {
+        _store.Initialize("master");
+        _store.AddOrUpdate(
+            new Snippet { Id = Guid.NewGuid(), Name = "pw", Slot = 4, PasteMethod = PasteMethod.Clipboard },
+            "secret123");
+
+        var entry = _store.GetBySlot(4);
+
+        Assert.NotNull(entry);
+        Assert.Equal("secret123", entry!.Value.Content);
+        Assert.Equal(PasteMethod.Clipboard, entry.Value.Method);
+    }
+
+    [Fact]
+    public void GetBySlot_UnassignedSlot_ReturnsNull()
+    {
+        _store.Initialize("master");
+        Assert.Null(_store.GetBySlot(9));
+    }
+
+    [Fact]
+    public void GetBySlot_DefaultsToAutoWhenNotSpecified()
+    {
+        _store.Initialize("master");
+        _store.AddOrUpdate(new Snippet { Id = Guid.NewGuid(), Name = "pw", Slot = 2 }, "v");
+
+        Assert.Equal(PasteMethod.Auto, _store.GetBySlot(2)!.Value.Method);
+    }
+
+    [Fact]
+    public void GetBySlot_EmptyContentSnippet_StillReturnsEntry()
+    {
+        _store.Initialize("master");
+        _store.AddOrUpdate(new Snippet { Id = Guid.NewGuid(), Name = "blank", Slot = 5 }, "");
+
+        var entry = _store.GetBySlot(5);
+
+        Assert.NotNull(entry);
+        Assert.Equal("", entry!.Value.Content);
+    }
+
+    [Fact]
+    public void PasteMethod_SurvivesRestartCycle()
+    {
+        _store.Initialize("master");
+        _store.AddOrUpdate(
+            new Snippet { Id = Guid.NewGuid(), Name = "pw", Slot = 1, PasteMethod = PasteMethod.Clipboard },
+            "v");
+
+        var reopened = new SnippetStore(_tempFile);
+        Assert.True(reopened.Unlock("master"));
+        Assert.Equal(PasteMethod.Clipboard, reopened.GetBySlot(1)!.Value.Method);
+    }
+
     // ── Persistence ──────────────────────────────────────────────────────────
 
     [Fact]

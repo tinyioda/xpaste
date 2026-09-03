@@ -18,6 +18,12 @@ public class Snippet
     /// </summary>
     public int Slot { get; set; } = 0;
 
+    /// <summary>
+    /// How this snippet is delivered to the focused window. Defaults to
+    /// <see cref="PasteMethod.Auto"/>, which types the content as keystrokes.
+    /// </summary>
+    public PasteMethod PasteMethod { get; set; } = PasteMethod.Auto;
+
     /// <summary>AES-256-GCM encrypted content, Base64-encoded.</summary>
     public string CipherText { get; set; } = string.Empty;
 

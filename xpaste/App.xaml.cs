@@ -31,6 +31,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         AppLogger.Info("=== xpaste starting ===");
+        AppLogger.Info($"Elevated: {ElevationService.IsElevated()}");
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         if (!_store.HasStore)
@@ -78,12 +79,19 @@ public partial class App : Application
         };        var logItem = new MenuItem { Header = "View Log" };
         logItem.Click += (_, _) => System.Diagnostics.Process.Start("explorer.exe",
             $"/select,\"{System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "xpaste", "xpaste.log")}\"");
+        var elevateItem = new MenuItem
+        {
+            Header = ElevationService.IsElevated() ? "Running as Administrator" : "Restart as Administrator…",
+            IsEnabled = !ElevationService.IsElevated()
+        };
+        elevateItem.Click += (_, _) => RestartElevated();
         var exitItem = new MenuItem { Header = "Exit" };
         exitItem.Click += (_, _) => ExitApp();
         menu.Items.Add(openItem);
         menu.Items.Add(changePwdItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(startupItem);
+        menu.Items.Add(elevateItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(logItem);
         menu.Items.Add(new Separator());
@@ -124,21 +132,44 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Handles a hotkey slot activation. Yields off the WM_HOTKEY handler via a short delay
-    /// before calling <see cref="InputSimulator.TypeText"/> to avoid SendInput being blocked.
+    /// Handles a hotkey slot activation. The injection runs on a background thread because it
+    /// blocks while waiting for the user to physically release Ctrl+Shift — doing that on the UI
+    /// thread would freeze the app and stall the very message pump the hotkey arrived on.
     /// </summary>
     private async void OnSlotActivated(int slot)
     {
         AppLogger.Info($"OnSlotActivated: slot={slot}, storeUnlocked={_store.IsUnlocked}");
         if (!_store.IsUnlocked) { AppLogger.Warn("Store is locked — ignoring slot activation"); return; }
 
-        var content = _store.GetContentBySlot(slot);
-        if (string.IsNullOrEmpty(content)) { AppLogger.Warn($"No snippet assigned to slot {slot}"); return; }
+        var entry = _store.GetBySlot(slot);
+        if (entry is not { } snippet || string.IsNullOrEmpty(snippet.Content))
+        {
+            AppLogger.Warn($"No snippet assigned to slot {slot}");
+            return;
+        }
 
-        AppLogger.Info($"Scheduling TypeText for slot {slot} ([REDACTED] {content.Length} chars)");
-        await Task.Delay(50);
-        AppLogger.Info($"Calling TypeText for slot {slot}");
-        InputSimulator.TypeText(content);
+        AppLogger.Info($"Dispatching slot {slot} ([REDACTED] {snippet.Content.Length} chars) via {snippet.Method}");
+
+        var result = await Task.Run(() => InputSimulator.TypeText(snippet.Content, snippet.Method));
+        if (!result.Success) NotifyInjectionFailure(result.Detail);
+    }
+
+    /// <summary>
+    /// Surfaces a failed paste to the user. The main window is normally hidden when a snippet is
+    /// typed, so a silent failure would be indistinguishable from the app not running at all.
+    /// </summary>
+    private void NotifyInjectionFailure(string detail)
+    {
+        AppLogger.Warn($"Paste failed: {detail}");
+        try
+        {
+            _trayIcon?.ShowNotification("xpaste could not type the snippet", detail,
+                H.NotifyIcon.Core.NotificationIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"Could not show tray notification: {ex.Message}");
+        }
     }
 
     /// <summary>Syncs the tray "Start with Windows" checkmark to the given value.</summary>
@@ -164,6 +195,12 @@ public partial class App : Application
             MessageBox.Show("Master password changed successfully.", "xpaste",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
+    }
+
+    /// <summary>Relaunches xpaste elevated so it can type into higher-integrity windows.</summary>
+    private void RestartElevated()
+    {
+        if (ElevationService.TryRestartElevated()) ExitApp();
     }
 
     /// <summary>Gracefully shuts down hotkeys, the tray icon, and the main window.</summary>

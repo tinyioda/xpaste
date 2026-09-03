@@ -53,6 +53,70 @@ public class MainViewModelTests : IDisposable
         Assert.Equal("", _vm.EditContent);
         Assert.Equal(0, _vm.EditSlot);
         Assert.Equal("", _vm.EditError);
+        Assert.Equal(PasteMethod.Auto, _vm.EditPasteMethod);
+    }
+
+    [Fact]
+    public void AddSnippet_ResetsPasteMethodAfterEditingAClipboardSnippet()
+    {
+        _store.AddOrUpdate(
+            new Snippet { Id = Guid.NewGuid(), Name = "Clip", Slot = 1, PasteMethod = PasteMethod.Clipboard },
+            "v");
+        _vm.Refresh();
+        _vm.EditSnippetCommand.Execute(_vm.Snippets.First());
+
+        _vm.AddSnippetCommand.Execute(null);
+
+        Assert.Equal(PasteMethod.Auto, _vm.EditPasteMethod);
+    }
+
+    // ── Paste method ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void PasteMethodOptions_OfferKeystrokesAndClipboard()
+    {
+        Assert.Contains(_vm.PasteMethodOptions, o => o.Value == PasteMethod.Auto);
+        Assert.Contains(_vm.PasteMethodOptions, o => o.Value == PasteMethod.Clipboard);
+        Assert.All(_vm.PasteMethodOptions, o => Assert.False(string.IsNullOrWhiteSpace(o.Label)));
+    }
+
+    [Fact]
+    public void EditSnippet_PopulatesPasteMethod()
+    {
+        var id = Guid.NewGuid();
+        _store.AddOrUpdate(
+            new Snippet { Id = id, Name = "Clip", Slot = 2, PasteMethod = PasteMethod.Clipboard },
+            "v");
+        _vm.Refresh();
+
+        _vm.EditSnippetCommand.Execute(_vm.Snippets.First(s => s.Id == id));
+
+        Assert.Equal(PasteMethod.Clipboard, _vm.EditPasteMethod);
+    }
+
+    [Fact]
+    public void SaveEdit_PersistsPasteMethod()
+    {
+        _vm.AddSnippetCommand.Execute(null);
+        _vm.EditName = "Long text";
+        _vm.EditContent = "lots of text";
+        _vm.EditSlot = 5;
+        _vm.EditPasteMethod = PasteMethod.Clipboard;
+        _vm.SaveEditCommand.Execute(null);
+
+        Assert.Equal(PasteMethod.Clipboard, _store.GetBySlot(5)!.Value.Method);
+    }
+
+    [Fact]
+    public void SaveEdit_DefaultsToAutoSoSnippetsTypeAsKeystrokes()
+    {
+        _vm.AddSnippetCommand.Execute(null);
+        _vm.EditName = "Password";
+        _vm.EditContent = "hunter2";
+        _vm.EditSlot = 6;
+        _vm.SaveEditCommand.Execute(null);
+
+        Assert.Equal(PasteMethod.Auto, _store.GetBySlot(6)!.Value.Method);
     }
 
     // ── EditSnippet ──────────────────────────────────────────────────────────

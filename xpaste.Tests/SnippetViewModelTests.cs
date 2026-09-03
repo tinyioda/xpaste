@@ -9,13 +9,21 @@ public class SnippetViewModelTests
     public void FromModel_MapsAllFields()
     {
         var id = Guid.NewGuid();
-        var meta = new Snippet { Id = id, Name = "My Password", Slot = 3 };
+        var meta = new Snippet { Id = id, Name = "My Password", Slot = 3, PasteMethod = PasteMethod.Clipboard };
         var vm = SnippetViewModel.FromModel(meta, "secret");
 
         Assert.Equal(id, vm.Id);
         Assert.Equal("My Password", vm.Name);
         Assert.Equal(3, vm.Slot);
         Assert.Equal("secret", vm.PlainContent);
+        Assert.Equal(PasteMethod.Clipboard, vm.PasteMethod);
+    }
+
+    [Fact]
+    public void FromModel_DefaultPasteMethodIsAuto()
+    {
+        var vm = SnippetViewModel.FromModel(new Snippet { Name = "x" }, "y");
+        Assert.Equal(PasteMethod.Auto, vm.PasteMethod);
     }
 
     [Fact]
@@ -28,6 +36,13 @@ public class SnippetViewModelTests
         Assert.Equal(id, model.Id);
         Assert.Equal("Test", model.Name);
         Assert.Equal(7, model.Slot);
+    }
+
+    [Fact]
+    public void ToModel_CarriesPasteMethod()
+    {
+        var vm = new SnippetViewModel { Name = "Test", PasteMethod = PasteMethod.Clipboard };
+        Assert.Equal(PasteMethod.Clipboard, vm.ToModel().PasteMethod);
     }
 
     [Fact]

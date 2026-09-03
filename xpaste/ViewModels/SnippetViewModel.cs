@@ -22,10 +22,13 @@ public partial class SnippetViewModel : ObservableObject
     /// <summary>Decrypted snippet content held in memory. Never written to disk in plain form.</summary>
     [ObservableProperty] private string _plainContent = string.Empty;
 
+    /// <summary>How this snippet is delivered to the focused window.</summary>
+    [ObservableProperty] private PasteMethod _pasteMethod = PasteMethod.Auto;
+
     /// <summary>Creates a <see cref="SnippetViewModel"/> from its persisted model and decrypted content.</summary>
     public static SnippetViewModel FromModel(Snippet meta, string plain)
-        => new() { Id = meta.Id, Name = meta.Name, Slot = meta.Slot, PlainContent = plain };
+        => new() { Id = meta.Id, Name = meta.Name, Slot = meta.Slot, PlainContent = plain, PasteMethod = meta.PasteMethod };
 
     /// <summary>Projects back to a <see cref="Snippet"/> model (without encrypted fields — those are set by the store).</summary>
-    public Snippet ToModel() => new() { Id = Id, Name = Name, Slot = Slot };
+    public Snippet ToModel() => new() { Id = Id, Name = Name, Slot = Slot, PasteMethod = PasteMethod };
 }

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using xpaste.Models;
 using xpaste.Services;
 
 namespace xpaste.ViewModels;
@@ -12,6 +13,13 @@ namespace xpaste.ViewModels;
 /// <param name="Value">Numeric slot value (0 = Unassigned, 1–10).</param>
 /// <param name="Label">Human-readable label shown in the UI (e.g. <c>"Ctrl+Shift+2"</c>).</param>
 public record SlotOption(int Value, string Label);
+
+/// <summary>
+/// Represents a paste-method entry in the edit-form ComboBox.
+/// </summary>
+/// <param name="Value">The underlying <see cref="Models.PasteMethod"/>.</param>
+/// <param name="Label">Human-readable label shown in the UI.</param>
+public record PasteMethodOption(PasteMethod Value, string Label);
 
 /// <summary>
 /// Primary view-model for <see cref="xpaste.MainWindow"/>.
@@ -29,6 +37,13 @@ public partial class MainViewModel : ObservableObject
     public List<SlotOption> SlotOptions { get; } = Enumerable.Range(0, 11)
         .Select(i => new SlotOption(i, i == 0 ? "Unassigned" : $"Ctrl+Shift+{(i == 10 ? "0" : i.ToString())}"))
         .ToList();
+
+    /// <summary>Delivery methods offered in the edit-form ComboBox.</summary>
+    public List<PasteMethodOption> PasteMethodOptions { get; } = new()
+    {
+        new(PasteMethod.Auto,       "Type as keystrokes (works in RDP, SSH, password fields)"),
+        new(PasteMethod.Clipboard,  "Clipboard + Ctrl+V (faster for long text, less secure)"),
+    };
 
     /// <summary>Whether xpaste is registered to launch automatically at Windows login.</summary>
     [ObservableProperty] private bool _autoStart;
@@ -50,6 +65,9 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Bound to the Slot ComboBox in the edit form.</summary>
     [ObservableProperty] private int _editSlot;
+
+    /// <summary>Bound to the delivery-method ComboBox in the edit form.</summary>
+    [ObservableProperty] private PasteMethod _editPasteMethod = PasteMethod.Auto;
 
     /// <summary>Validation error message shown below the edit form fields. Empty when there is no error.</summary>
     [ObservableProperty] private string _editError = "";
@@ -104,6 +122,7 @@ public partial class MainViewModel : ObservableObject
         EditName = "";
         EditContent = "";
         EditSlot = 0;
+        EditPasteMethod = PasteMethod.Auto;
         EditError = "";
         EditTitle = "New Snippet";
         IsEditing = true;
@@ -117,6 +136,7 @@ public partial class MainViewModel : ObservableObject
         EditName = vm.Name;
         EditContent = vm.PlainContent;
         EditSlot = vm.Slot;
+        EditPasteMethod = vm.PasteMethod;
         EditError = "";
         EditTitle = "Edit Snippet";
         IsEditing = true;
@@ -167,7 +187,14 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        var vm = new SnippetViewModel { Id = EditId, Name = EditName.Trim(), PlainContent = EditContent, Slot = EditSlot };
+        var vm = new SnippetViewModel
+        {
+            Id = EditId,
+            Name = EditName.Trim(),
+            PlainContent = EditContent,
+            Slot = EditSlot,
+            PasteMethod = EditPasteMethod,
+        };
         _store.AddOrUpdate(vm.ToModel(), vm.PlainContent);
         Refresh();
         IsEditing = false;

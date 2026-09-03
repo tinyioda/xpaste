@@ -181,6 +181,16 @@ public class SnippetStore
     public string? GetContentBySlot(int slot)
         => Snippets.FirstOrDefault(x => x.Meta.Slot == slot).PlainContent;
 
+    /// <summary>
+    /// Returns the decrypted content and delivery method for the snippet assigned to
+    /// <paramref name="slot"/>, or <c>null</c> if no snippet is assigned to that slot.
+    /// </summary>
+    public (string Content, PasteMethod Method)? GetBySlot(int slot)
+    {
+        var match = Snippets.FirstOrDefault(x => x.Meta.Slot == slot);
+        return match.Meta == null ? null : (match.PlainContent, match.Meta.PasteMethod);
+    }
+
     private void Save()
     {
         if (_key == null) return;

@@ -140,6 +140,15 @@
                           SelectedValuePath="Value"
                           SelectedValue="{Binding EditSlot}"
                           Foreground="{DynamicResource MaterialDesignBody}"
+                          Margin="0,0,0,16"/>
+
+                <ComboBox md:HintAssist.Hint="Delivery method"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          ItemsSource="{Binding PasteMethodOptions}"
+                          DisplayMemberPath="Label"
+                          SelectedValuePath="Value"
+                          SelectedValue="{Binding EditPasteMethod}"
+                          Foreground="{DynamicResource MaterialDesignBody}"
                           Margin="0,0,0,8"/>
 
                 <TextBlock Text="{Binding EditError}" Foreground="#EF5350"
@@ -265,8 +274,8 @@
                         <TextBlock Grid.Row="0" Grid.Column="2" Text="Open this window" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Right-click" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
                         <TextBlock Grid.Row="2" Grid.Column="2" Text="Change password, auto-start, view log, exit" Foreground="White" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="RDP windows" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
-                        <TextBlock Grid.Row="4" Grid.Column="2" Text="Auto-detected — uses clipboard for reliable paste into remote sessions" Foreground="White" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="RDP / SSH" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="4" Grid.Column="2" Text="Snippets are typed as real keystrokes, so they work in Remote Desktop, terminals and password fields" Foreground="White" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
                     </Grid>
 
                     <Button Content="CLOSE" HorizontalAlignment="Center" Margin="0,24,0,0"
