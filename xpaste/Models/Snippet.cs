@@ -13,7 +13,7 @@ public class Snippet
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Hotkey slot assignment (1–10). Slot 10 maps to <c>Ctrl+Shift+0</c>.
+    /// Hotkey slot assignment (1–10). Slot 10 maps to <c>Alt+Shift+0</c>.
     /// A value of 0 means the snippet is unassigned and cannot be triggered by a hotkey.
     /// </summary>
     public int Slot { get; set; } = 0;

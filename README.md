@@ -1,13 +1,13 @@
-﻿# xpaste
+# xpaste
 
 A lightweight Windows system-tray app for typing predefined text snippets — passwords, boilerplate text, anything you have to type repeatedly — into whatever window has focus, triggered by a global hotkey.
 
 ## Features
 
-- **Global hotkeys** — Press `Ctrl+Shift+1` through `Ctrl+Shift+9` (and `Ctrl+Shift+0` for slot 10) to instantly type a snippet into any focused window
+- **Global hotkeys** — Press `Alt+Shift+1` through `Alt+Shift+9` (and `Alt+Shift+0` for slot 10) to instantly type a snippet into any focused window
 - **Real keystroke injection** — Snippets are typed one character at a time as hardware-style scan codes, exactly as a physical keyboard would produce them. This is what makes them work in **RDP sessions, SSH/terminal password prompts and Windows password fields**, and it means your password is never placed on the clipboard.
 - **Encrypted storage** — All snippet content is encrypted with AES-256-GCM using a master password you set on first launch. The master password is never stored.
-- **Lives in the tray** — Minimize to the system tray via `Ctrl+Shift+-`. Click or double-click the **XP** tray icon (or press `Ctrl+Shift++`) to reopen.
+- **Lives in the tray** — Minimize to the system tray via `Alt+Shift+-`. Click or double-click the **XP** tray icon (or press `Alt+Shift++`) to reopen.
 - **Auto-start** — Toggle "Start with Windows" in the tray menu or the header switch to launch xpaste automatically at login (registry run key, no admin rights required)
 - **CRUD management** — Add, edit, and delete snippets from the inline management UI
 - **Inline confirmations** — Delete confirmation and help overlay appear inside the main window, not as separate popups
@@ -37,15 +37,15 @@ The output lands in `xpaste\publish\xpaste.exe` — a single portable executable
 ### First Launch
 
 1. On first run you will be prompted to create a **master password**. This password encrypts all your snippets — there is no recovery if you forget it.
-2. The main window opens immediately — minimize to tray whenever you like with `Ctrl+Shift+-` or by closing the window.
+2. The main window opens immediately — minimize to tray whenever you like with `Alt+Shift+-` or by closing the window.
 
 ## Usage
 
 | Action | How |
 |---|---|
-| Open management window | Click (or double-click) the **XP** tray icon, or press `Ctrl+Shift++` |
-| Minimize to tray | Press `Ctrl+Shift+-` or close the window |
-| Type snippet into focused window | `Ctrl+Shift+1` through `Ctrl+Shift+0` |
+| Open management window | Click (or double-click) the **XP** tray icon, or press `Alt+Shift++` |
+| Minimize to tray | Press `Alt+Shift+-` or close the window |
+| Type snippet into focused window | `Alt+Shift+1` through `Alt+Shift+0` |
 | Add a snippet | Click the **+** button |
 | Edit a snippet | Click the pencil icon on a snippet card |
 | Choose how a snippet is delivered | **Delivery method** dropdown in the edit form |
@@ -76,7 +76,7 @@ Two details are load-bearing:
 - **Scan codes must be real.** RDP, Hyper-V, VMware and Citrix forward the *scan code* of a key
   event, not the virtual key. An event with `wScan == 0` arrives at the remote end as "no key at
   all" — which is why virtual-key-only injection silently does nothing over RDP.
-- **The hotkey modifiers must be released first.** `Ctrl+Shift+1` leaves Ctrl and Shift physically
+- **The hotkey modifiers must be released first.** `Alt+Shift+1` leaves Ctrl and Shift physically
   down and auto-repeating. xpaste waits for you to let go before typing; if you keep holding the
   hotkey it refuses to type rather than sending mangled text into a password field.
 
@@ -144,15 +144,22 @@ Open the log via right-click tray icon → **View Log**.
 
 | Hotkey | Slot |
 |---|---|
-| `Ctrl+Shift+1` | Slot 1 |
-| `Ctrl+Shift+2` | Slot 2 |
+| `Alt+Shift+1` | Slot 1 |
+| `Alt+Shift+2` | Slot 2 |
 | … | … |
-| `Ctrl+Shift+9` | Slot 9 |
-| `Ctrl+Shift+0` | Slot 10 |
-| `Ctrl+Shift++` | Open/close window |
-| `Ctrl+Shift+-` | Minimize to tray |
+| `Alt+Shift+9` | Slot 9 |
+| `Alt+Shift+0` | Slot 10 |
+| `Alt+Shift++` | Open/close window |
+| `Alt+Shift+-` | Minimize to tray |
 
 Slots marked **Unassigned** in the UI do nothing when triggered.
+
+> **If a hotkey does nothing:** `Alt+Shift` is also the legacy Windows shortcut for *switching
+> keyboard layout*. If you have two or more input languages installed, Windows may consume the
+> combination before xpaste sees it. Clear it under **Settings → Time & language → Typing →
+> Advanced keyboard settings → Input language hot keys**, and set "Between input languages" to
+> *Not Assigned*. `xpaste.log` records the result of every `RegisterHotKey` call at startup, so a
+> `FAILED err=1409` line there means another application already owns that combination.
 
 ## Tech Stack
 

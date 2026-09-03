@@ -16,16 +16,16 @@ public class ConverterTests
         => Assert.Equal("Unassigned", _slotConv.Convert(0, typeof(string), null!, _culture));
 
     [Theory]
-    [InlineData(1, "Ctrl+Shift+1")]
-    [InlineData(2, "Ctrl+Shift+2")]
-    [InlineData(5, "Ctrl+Shift+5")]
-    [InlineData(9, "Ctrl+Shift+9")]
+    [InlineData(1, "Alt+Shift+1")]
+    [InlineData(2, "Alt+Shift+2")]
+    [InlineData(5, "Alt+Shift+5")]
+    [InlineData(9, "Alt+Shift+9")]
     public void SlotDisplay_Slots1To9_ReturnsCorrectLabel(int slot, string expected)
         => Assert.Equal(expected, _slotConv.Convert(slot, typeof(string), null!, _culture));
 
     [Fact]
     public void SlotDisplay_Slot10_ReturnCtrlShift0()
-        => Assert.Equal("Ctrl+Shift+0", _slotConv.Convert(10, typeof(string), null!, _culture));
+        => Assert.Equal("Alt+Shift+0", _slotConv.Convert(10, typeof(string), null!, _culture));
 
     [Fact]
     public void SlotDisplay_OutOfRange_ReturnsUnassigned()

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 using xpaste.Models;
@@ -33,7 +33,7 @@ public readonly record struct InjectionResult(bool Success, string Detail)
 public static class InputSimulator
 {
     /// <summary>
-    /// How long to wait for the user to release the Ctrl+Shift hotkey before typing. Injecting while
+    /// How long to wait for the user to release the Alt+Shift hotkey before typing. Injecting while
     /// modifiers are physically held corrupts every character.
     /// </summary>
     private const int ModifierReleaseTimeoutMs = 2000;
@@ -76,7 +76,7 @@ public static class InputSimulator
 
     /// <summary>
     /// Guards against overlapping injections. Two concurrent runs would interleave their keystrokes
-    /// and scramble both snippets â€” unacceptable when one of them is a password.
+    /// and scramble both snippets — unacceptable when one of them is a password.
     /// </summary>
     private static int _busy;
 
@@ -85,12 +85,12 @@ public static class InputSimulator
     /// </summary>
     /// <param name="text">The snippet content to deliver.</param>
     /// <param name="method">Delivery strategy; <see cref="PasteMethod.Auto"/> picks keystrokes.</param>
-    /// <remarks>Call this from a background thread â€” it blocks while waiting for modifier release.</remarks>
+    /// <remarks>Call this from a background thread — it blocks while waiting for modifier release.</remarks>
     public static InjectionResult TypeText(string text, PasteMethod method)
     {
         if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0)
         {
-            AppLogger.Warn("An injection is already running â€” ignoring the overlapping hotkey.");
+            AppLogger.Warn("An injection is already running — ignoring the overlapping hotkey.");
             return InjectionResult.Fail("xpaste is still typing the previous snippet.");
         }
 
@@ -118,7 +118,7 @@ public static class InputSimulator
         if (NativeInput.IsSecureDesktopActive())
         {
             const string msg = "Windows is showing a secure screen (UAC prompt, lock screen or Ctrl+Alt+Del). " +
-                               "No application can type into it â€” enter the password manually.";
+                               "No application can type into it — enter the password manually.";
             AppLogger.Warn(msg);
             return InjectionResult.Fail(msg);
         }
@@ -128,8 +128,8 @@ public static class InputSimulator
 
         if (!PrepareKeyboardState())
         {
-            const string msg = "Ctrl+Shift is still held down. Release the hotkey and try again â€” " +
-                               "typing while a modifier is down would corrupt the snippet.";
+            string msg = $"{Hotkeys.ModifierLabel} is still held down. Release the hotkey and try again — " +
+                         "typing while a modifier is down would corrupt the snippet.";
             AppLogger.Warn(msg);
             return InjectionResult.Fail(msg);
         }
@@ -139,7 +139,7 @@ public static class InputSimulator
         string target = NativeInput.GetForegroundProcessName() ?? "unknown";
 
         // Must be checked up front. SendInput reports success even when UIPI discards the input,
-        // so detecting this after the fact is impossible â€” and a false "typed it" is exactly the
+        // so detecting this after the fact is impossible — and a false "typed it" is exactly the
         // silent failure this whole component exists to eliminate.
         if (NativeInput.IsForegroundWindowHigherIntegrity())
         {
@@ -158,7 +158,7 @@ public static class InputSimulator
     /// Waits for the hotkey's modifiers to be released, then force-releases anything still latched.
     /// <para>
     /// Refusing to type is deliberate. The keyboard auto-repeats a held modifier, so a synthetic
-    /// key-up is undone within milliseconds â€” proceeding anyway would push mangled text into a
+    /// key-up is undone within milliseconds — proceeding anyway would push mangled text into a
     /// password field, which is worse than doing nothing.
     /// </para>
     /// </summary>
@@ -167,7 +167,7 @@ public static class InputSimulator
     {
         if (!NativeInput.WaitForModifierRelease(ModifierReleaseTimeoutMs))
         {
-            AppLogger.Warn($"Modifiers still held after {ModifierReleaseTimeoutMs} ms â€” aborting.");
+            AppLogger.Warn($"Modifiers still held after {ModifierReleaseTimeoutMs} ms — aborting.");
             return false;
         }
 

@@ -97,8 +97,8 @@ internal static class NativeInput
     /// <summary>
     /// Blocks until the user releases the modifiers that triggered the hotkey, or the timeout expires.
     /// <para>
-    /// This is essential: <c>Ctrl+Shift+N</c> leaves Ctrl and Shift physically down, and the keyboard
-    /// auto-repeats them. Injecting while they are held makes the target see <c>Ctrl+Shift+&lt;key&gt;</c>
+    /// This is essential: <c>Alt+Shift+N</c> leaves Alt and Shift physically down, and the keyboard
+    /// auto-repeats them. Injecting while they are held makes the target see <c>Alt+Shift+&lt;key&gt;</c>
     /// instead of the intended character, which is why typing into terminals and RDP produced nothing.
     /// </para>
     /// </summary>

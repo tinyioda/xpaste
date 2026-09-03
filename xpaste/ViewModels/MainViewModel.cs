@@ -11,7 +11,7 @@ namespace xpaste.ViewModels;
 /// Represents a single entry in the hotkey-slot ComboBox.
 /// </summary>
 /// <param name="Value">Numeric slot value (0 = Unassigned, 1–10).</param>
-/// <param name="Label">Human-readable label shown in the UI (e.g. <c>"Ctrl+Shift+2"</c>).</param>
+/// <param name="Label">Human-readable label shown in the UI (e.g. <c>"Alt+Shift+2"</c>).</param>
 public record SlotOption(int Value, string Label);
 
 /// <summary>
@@ -35,7 +35,7 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>All available hotkey slots for the edit-form ComboBox (0 = Unassigned, 1–10).</summary>
     public List<SlotOption> SlotOptions { get; } = Enumerable.Range(0, 11)
-        .Select(i => new SlotOption(i, i == 0 ? "Unassigned" : $"Ctrl+Shift+{(i == 10 ? "0" : i.ToString())}"))
+        .Select(i => new SlotOption(i, Hotkeys.ForSlot(i)))
         .ToList();
 
     /// <summary>Delivery methods offered in the edit-form ComboBox.</summary>
@@ -180,10 +180,9 @@ public partial class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(EditName))  { EditError = "Name is required."; return; }
         if (string.IsNullOrWhiteSpace(EditContent)) { EditError = "Content is required."; return; }
 
-        var slotLabel = EditSlot == 10 ? "0" : EditSlot.ToString();
         if (EditSlot > 0 && Snippets.Any(s => s.Slot == EditSlot && s.Id != EditId))
         {
-            EditError = $"Ctrl+Shift+{slotLabel} is already assigned.";
+            EditError = $"{Hotkeys.ForSlot(EditSlot)} is already assigned.";
             return;
         }
 

@@ -133,7 +133,7 @@ public partial class App : Application
 
     /// <summary>
     /// Handles a hotkey slot activation. The injection runs on a background thread because it
-    /// blocks while waiting for the user to physically release Ctrl+Shift — doing that on the UI
+    /// blocks while waiting for the user to physically release Alt+Shift — doing that on the UI
     /// thread would freeze the app and stall the very message pump the hotkey arrived on.
     /// </summary>
     private async void OnSlotActivated(int slot)

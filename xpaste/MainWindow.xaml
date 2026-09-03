@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:conv="clr-namespace:xpaste.Converters"
+        xmlns:svc="clr-namespace:xpaste.Services"
         Title="xpaste" Height="600" Width="620" MinWidth="500" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="False"
@@ -181,7 +182,7 @@
 
         <!-- ═══ FOOTER ═══ -->
         <Border Grid.Row="3" Background="{DynamicResource MaterialDesignDivider}" Padding="16,8">
-            <TextBlock Text="Ctrl+Shift+1–0  type snippet  •  Ctrl+Shift++  open  •  Ctrl+Shift+-  minimize"
+            <TextBlock Text="{x:Static svc:Hotkeys.FooterSummary}"
                        FontSize="11" Foreground="{DynamicResource MaterialDesignBody}"
                        Opacity="0.6" HorizontalAlignment="Center"/>
         </Border>
@@ -226,7 +227,7 @@
                     <TextBlock Text="How to use xpaste" FontSize="16" FontWeight="Bold"
                                Foreground="White"
                                HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="All hotkeys require Ctrl+Shift" FontSize="11"
+                    <TextBlock Text="{x:Static svc:Hotkeys.ModifierRequirementLabel}" FontSize="11"
                                Foreground="#AAAAAA"
                                HorizontalAlignment="Center" Margin="0,0,0,16"/>
 
@@ -246,11 +247,11 @@
                             <RowDefinition Height="6"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+Shift+1 through 0" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static svc:Hotkeys.SlotRangeLabel}" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
                         <TextBlock Grid.Row="0" Grid.Column="2" Text="Type snippet into any focused window" Foreground="White" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+Shift++" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static svc:Hotkeys.ToggleLabel}" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
                         <TextBlock Grid.Row="2" Grid.Column="2" Text="Open / close this window" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+Shift+–" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="{x:Static svc:Hotkeys.MinimizeLabel}" FontFamily="Consolas" FontSize="12" Foreground="#4DB6AC" VerticalAlignment="Center"/>
                         <TextBlock Grid.Row="4" Grid.Column="2" Text="Minimize to tray" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
                     </Grid>
 
