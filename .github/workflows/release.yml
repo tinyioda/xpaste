@@ -89,10 +89,10 @@ jobs:
           }
 
           if ($null -eq $release) {
-              gh release create $tag --verify-tag --title "xpaste $tag" --generate-notes --draft
+              $releaseJson = gh api --method POST "repos/$repository/releases" `
+                -f tag_name=$tag -f target_commitish=$env:GITHUB_SHA `
+                -f name="xpaste $tag" -F generate_release_notes=true -F draft=true
               if ($LASTEXITCODE -ne 0) { throw "Could not create draft release $tag." }
-              $releaseJson = gh api "repos/$repository/releases/tags/$tag"
-              if ($LASTEXITCODE -ne 0) { throw "Could not read draft release $tag." }
               $release = ($releaseJson -join "`n") | ConvertFrom-Json
           }
 
