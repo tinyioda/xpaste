@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  queue: max
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+
+    steps:
+      - name: Check out source and release tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run tests
+        run: dotnet test .\xpaste.Tests\xpaste.Tests.csproj --configuration Release
+
+      - name: Determine release version
+        id: version
+        run: |
+          $release = & .\.github\scripts\Get-ReleaseVersion.ps1 -Commit $env:GITHUB_SHA
+          "tag=$($release.Tag)" >> $env:GITHUB_OUTPUT
+          "version=$($release.Version)" >> $env:GITHUB_OUTPUT
+          "tag_exists=$($release.TagExists.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Publish Windows executable
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet publish .\xpaste\xpaste.csproj --configuration Release `
+            -p:PublishProfile=win-x64 -p:Version=$env:RELEASE_VERSION `
+            -p:ContinuousIntegrationBuild=true `
+            --output "$env:RUNNER_TEMP\xpaste-release"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_TAG_EXISTS: ${{ steps.version.outputs.tag_exists }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          $repository = $env:GITHUB_REPOSITORY
+          $asset = Join-Path $env:RUNNER_TEMP 'xpaste-release\xpaste.exe'
+          if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) {
+              throw "Published executable not found: $asset"
+          }
+
+          # Reserve the version for this commit, even if a later upload fails.
+          if ($env:RELEASE_TAG_EXISTS -ne 'true') {
+              git tag $tag $env:GITHUB_SHA
+              if ($LASTEXITCODE -ne 0) { throw "Could not create tag $tag." }
+              git push origin "refs/tags/$tag"
+              if ($LASTEXITCODE -ne 0) { throw "Could not push tag $tag." }
+          }
+
+          $releaseJson = gh api --paginate "repos/$repository/releases?per_page=100" `
+            --jq '.[] | select(.tag_name == env.RELEASE_TAG) | {id, draft}'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not look up existing releases.' }
+
+          $release = if ($releaseJson) { ($releaseJson -join "`n") | ConvertFrom-Json } else { $null }
+          if ($null -ne $release -and -not $release.draft) {
+              Write-Host "Release $tag is already published; leaving it unchanged."
+              exit 0
+          }
+
+          if ($null -eq $release) {
+              gh release create $tag --verify-tag --title "xpaste $tag" --generate-notes --draft
+              if ($LASTEXITCODE -ne 0) { throw "Could not create draft release $tag." }
+              $releaseJson = gh api "repos/$repository/releases/tags/$tag"
+              if ($LASTEXITCODE -ne 0) { throw "Could not read draft release $tag." }
+              $release = ($releaseJson -join "`n") | ConvertFrom-Json
+          }
+
+          gh release upload $tag $asset --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Could not upload the executable for $tag." }
+
+          # Let GitHub select Latest by version/date when an older release is retried.
+          gh api --method PATCH "repos/$repository/releases/$($release.id)" `
+            -F draft=false -f make_latest=legacy --silent
+          if ($LASTEXITCODE -ne 0) { throw "Could not publish release $tag." }

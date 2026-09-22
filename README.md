@@ -14,10 +14,16 @@ A lightweight Windows system-tray app for typing predefined text snippets — pa
 
 ## Getting Started
 
+### Download a Release
+
+Download `xpaste.exe` from the [latest GitHub Release](https://github.com/tinyioda/xpaste/releases/latest).
+It is a self-contained Windows x64 executable: no separate .NET installation is required.
+The first release becomes available when the release workflow first runs successfully on `main`.
+
 ### Requirements
 
 - Windows 10 or later (64-bit)
-- [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) for source builds; downloaded releases include the runtime
 
 ### Build from Source
 
@@ -33,6 +39,22 @@ dotnet publish
 ```
 
 The output lands in `xpaste\publish\xpaste.exe` — a single portable executable that bundles the .NET 10 runtime and all dependencies. Copy it anywhere and run it.
+
+### Automated Releases
+
+The **Release** GitHub Actions workflow runs whenever changes land on `main`, including merged pull
+requests and direct pushes. It runs the test suite, publishes with the existing `win-x64` profile,
+and attaches `xpaste.exe` to a GitHub Release with automatically generated release notes.
+
+- Releases start at `v1.0.0`. Each new commit gets the next patch version after the highest
+  existing stable `vMAJOR.MINOR.PATCH` tag; prerelease and unrelated tags are ignored.
+- The executable is stamped with the same version as its release tag.
+- Release runs are queued so concurrent merges do not allocate the same version.
+- A tag is reserved for the exact triggering commit before uploading. If a run fails, rerun it
+  from the Actions page to reuse that tag and finish its draft release. Published releases are
+  left unchanged on reruns.
+- The workflow can also be started manually with **Actions → Release → Run workflow**, selecting
+  `main`. It uses the built-in `GITHUB_TOKEN`; no additional secret is required.
 
 ### First Launch
 
